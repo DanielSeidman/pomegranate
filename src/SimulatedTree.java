@@ -27,12 +27,22 @@
 */
 
 import java.awt.Color;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Random;
+import java.util.Stack;
 
 /**
  * Simulated cell lineage tree
@@ -44,8 +54,10 @@ public class SimulatedTree {
 	
 	private ArrayList<CellPopulation> nodes; 
 	private HashMap<CellPopulation, ArrayList<CellPopulation>> edges;
+	private HashMap<CellPopulation, CellPopulation> parents;
 	private int numDeadNodes;
 	private Random randGen = new Random();
+	private int mutCount;
 	
 	/**
 	 * Creates an initial tree with the GL root node
@@ -53,10 +65,12 @@ public class SimulatedTree {
 	public SimulatedTree() {
 		nodes = new ArrayList<CellPopulation>();
 		edges = new HashMap<CellPopulation, ArrayList<CellPopulation>>();
+		parents = new HashMap<CellPopulation, CellPopulation>();
 		CellPopulation germlineRoot = new CellPopulation(); 
 		germlineRoot.setGermline();
 		nodes.add(germlineRoot);
 		numDeadNodes = 0;
+		mutCount = 0;
 	}
 	
 	/**
@@ -64,7 +78,8 @@ public class SimulatedTree {
 	 * create a descendant population or undergo death (except root)
 	 * with some probability
 	 */
-	public void grow() {
+	public void grow(HashMap<Integer, ArrayList<SVData>> svs) {
+		HashSet<String> usedSVs = new HashSet<String>();
 		ArrayList<CellPopulation> children = new ArrayList<CellPopulation>();
 		for(CellPopulation node : nodes) {
 			if(node.isDead()) continue;
@@ -81,18 +96,34 @@ public class SimulatedTree {
 			Mutation childMut = null;
 			float roll = randGen.nextFloat();
 			if(roll < Parameters.PROB_SNV) {
-				if(node.isCNV() && Parameters.UP_CNV_EFFECT){
+				if(node.isCNV() && Parameters.UP_CNV_EFFECT && !(node.getLastSNVORCNVMutation() instanceof Mutation.SV)){
 					childMut = new Mutation.SNV((Mutation.CNV) node.getLastMutation());
+					mutCount++;
+					//System.out.println("mut: "+mutCount);
 				} else {
 					childMut = new Mutation.SNV();
+					mutCount++;
+					//System.out.println("mut: "+mutCount);
 				}
 			} else if(roll < (Parameters.PROB_SNV + Parameters.PROB_CNV)) {
 				if(node.isCNV() || node.isGermline || !Parameters.UP_CNV_EFFECT) {
 					childMut = new Mutation.CNV();
+					mutCount++;
+					//System.out.println("mut: "+mutCount);
 				} else {
-					childMut = new Mutation.CNV((Mutation.SNV) node.getLastMutation());
+					childMut = new Mutation.CNV((Mutation.SNV) node.getLastSNVORCNVMutation());
+					mutCount++;
+					//System.out.println("mut: "+mutCount);
 				}
-			}
+			}/* else if((!svs.isEmpty()) && roll<(Parameters.PROB_SNV + Parameters.PROB_CNV+Parameters.PROB_SV)){
+				childMut = new Mutation.SV(svs);
+				if(childMut.chr==-5)
+					childMut=null;
+				else
+					mutCount++;
+				//System.out.println("mut: "+mutCount);
+			}*/
+			
 			if(childMut == null) continue;
 			
 			CellPopulation child = new CellPopulation(); 
@@ -105,6 +136,7 @@ public class SimulatedTree {
 				edges.put(node, new ArrayList<CellPopulation>());
 			}
 			edges.get(node).add(child);
+			parents.put(child, node);
 		}
 		nodes.addAll(children);
 	}
@@ -135,9 +167,11 @@ public class SimulatedTree {
 	
 	/**
 	 * Extract a sample using randomized sampling
+	 * @throws IOException 
 	 */
-	public TumorSample getSample() {
+	public TumorSample getSample() throws IOException {
 		ArrayList<CellPopulation> subclones = selectSubclones(nodes, Parameters.MAX_NUM_SUBCLONES);
+		//printRefPlus(subclones);
 		return createSample(subclones, Parameters.NUM_CELLS_PER_SAMPLE, getNormalContamination());
 	}
 	
@@ -413,6 +447,171 @@ public class SimulatedTree {
 	    
 	    t += "}";
 		return t;
+	}
+	
+	public HashMap<Integer, HashMap<Integer, Mutation>> toPositionMap(CellPopulation c){
+		HashMap<Integer, HashMap<Integer, Mutation>> posMap = new HashMap<Integer, HashMap<Integer, Mutation>>();
+		for(Mutation m: c.mutations){
+			Integer chrom = m.chr;
+			if(!posMap.containsKey(chrom))
+				posMap.put(chrom, new HashMap<Integer, Mutation>());
+			if(m instanceof Mutation.SV){
+				posMap.get(chrom).put(((Mutation.SV)m).startPos, m);
+			}
+			else if(m instanceof Mutation.CNV){
+				posMap.get(chrom).put(-2, m);//Temp fix;
+			}
+			else
+				posMap.get(chrom).put(((Mutation.SNV)m).position, m);
+		}
+		return posMap;
+	}
+	
+	public void printRefPlus(ArrayList<CellPopulation> sampleNodes) throws IOException{
+		ArrayList<String> ongoingLines = new ArrayList<String>();
+		ArrayList<Integer> openSVs = new ArrayList<Integer>();
+		ArrayList<HashMap<Integer, HashMap<Integer, Mutation>>> variants = new ArrayList<HashMap<Integer, HashMap<Integer, Mutation>>>();
+		ArrayList<BufferedWriter> outputStreams = new ArrayList<BufferedWriter>();
+		int sampleCount=0;
+		for(CellPopulation cp: sampleNodes){
+			ongoingLines.add("");
+			openSVs.add(-1);
+			variants.add(toPositionMap(cp));
+			File fout = new File("S:\\genomeData\\outputSimulation1\\sampleRef"+sampleCount+".fa");
+			FileOutputStream fos = new FileOutputStream(fout);
+		 
+			BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos));
+			outputStreams.add(bw);
+			sampleCount++;
+		}
+		
+		
+		File file = new File("S:\\genomeData\\hg38.fa");
+		BufferedReader reader = null;
+		
+		try {
+		    reader = new BufferedReader(new FileReader(file));
+		    String text = null;
+            int index = 0;
+            int currChrom = 0;
+            
+		    while ((text = reader.readLine()) != null) {
+		    	if(text.charAt(0)=='>'){
+		    		String[] textTokens = text.split("_|\t| ");
+		    		if(textTokens.length>1){
+		    			currChrom=-2;
+		    			for(BufferedWriter bw: outputStreams){
+			    			bw.write(text);
+							bw.newLine();
+			    		}
+			    		continue;
+		    		}
+		    		String chromString = textTokens[0].substring(4, textTokens[0].length());
+		    		if(chromString.equals("X"))
+		    			currChrom=23;
+		    		else if (chromString.equals("Y"))
+		    			currChrom=24;
+		    		else if (chromString.equals("M"))
+		    			currChrom=0;
+		    		else
+		    			currChrom = Integer.parseInt(textTokens[0].substring(4, textTokens[0].length()));
+		    		for(BufferedWriter bw: outputStreams){
+		    			bw.write(text);
+						bw.newLine();
+		    		}
+		    		continue;
+		    	}
+		    	if(currChrom==-2){
+		    		//System.out.println("test");
+		    		for(BufferedWriter bw: outputStreams){
+		    			bw.write(text);
+						bw.newLine();
+		    		}
+		    		continue;
+		    	}
+		    		
+		    	for(int charIndex = 0; charIndex<text.length(); charIndex++)
+		    	{
+		    		char base = text.charAt(charIndex);
+			    	for(int x = 0; x<ongoingLines.size(); x++){
+			    		if(variants.get(x).containsKey(currChrom)&&variants.get(x).get(currChrom).containsKey(index+charIndex)){
+			    			Mutation m = variants.get(x).get(currChrom).get(index+charIndex);
+			    			if(m instanceof Mutation.SNV){
+			    				if(base == 'N')
+			    					base = 'N';
+			    				else if(Character.isUpperCase(base)){
+			    					if(base=='A')
+				    					base='T';
+				    				else
+				    					base='A';
+			    				}
+			    				else{
+				    				if(base=='a')
+				    					base='t';
+				    				else
+				    					base='a';
+			    				}
+			    			}
+			    			else if(m instanceof Mutation.SV)
+			    				openSVs.set(x, ((Mutation.SV)m).endPos);
+			    				
+			    		}
+			    		String s = ongoingLines.get(x);
+		    			if(openSVs.get(x)==-1){
+		    				ongoingLines.set(x, ongoingLines.get(x)+base);
+		    				if(ongoingLines.get(x).length()==50){
+		    					BufferedWriter bw = outputStreams.get(x);
+		    					bw.write(ongoingLines.get(x));
+								bw.newLine();
+								ongoingLines.set(x, "");
+		    				}
+		    			}
+		    			else if(openSVs.get(x)==index+charIndex)
+		    				openSVs.set(x, -1);
+		    			
+		    				
+		    			
+		    		}
+		    	}
+		    	index+=50;
+		    	
+		    }
+		} catch (FileNotFoundException e) {
+		    e.printStackTrace();
+		} catch (IOException e) {
+		    e.printStackTrace();
+		} finally {
+		    try {
+		        if (reader != null) {
+		            reader.close();
+		        }
+		    } catch (IOException e) {
+		    }
+		}
+		for(BufferedWriter bw: outputStreams){
+		 
+			bw.close();
+		}
+	}
+	
+	public void propogateSVMutation(HashMap<Integer, ArrayList<SVData>> svs, ArrayList<CellPopulation> choices){
+		int svCount = 0;
+		while(!svs.isEmpty()&&svCount<choices.size()*50){
+			svCount++;
+			Mutation.SV childMut = new Mutation.SV(svs);
+			Stack<CellPopulation> stack = new Stack<CellPopulation>();
+			stack.push(choices.get((int)(Math.random()*choices.size())));
+			stack.get(0).addSVName(childMut.name);
+			while(!stack.isEmpty()){
+				CellPopulation current = stack.pop();
+				current.addMutation(childMut);
+				
+				//current.addToName(childMut.name);
+				if(edges.containsKey(current))
+					for(CellPopulation child: edges.get(current))
+						stack.push(child);
+			}
+		}
 	}
 
 }

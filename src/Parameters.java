@@ -8,11 +8,14 @@ public class Parameters {
 	protected static int MAX_POPULATION_SIZE = 1000000;
 	protected static double PROB_SNV = 0.15;
 	protected static double PROB_CNV = 0.02;
+	protected static double PROB_SV = .005;
 	protected static double PROB_DEATH = 0.06;
 	protected static boolean UP_CNV_EFFECT = false;
 	
 	// sampling
 	protected static int[] NUM_SAMPLES_ARRAY = {5};
+	protected static String svFileName = "N/A";
+	protected static String snvFileName = "N/A";
 	protected static int[] COVERAGE_ARRAY = {1000};
 	protected static boolean LOCALIZED_SAMPLING = false;
 	protected static int MAX_NUM_SUBCLONES = 5;
@@ -21,4 +24,5 @@ public class Parameters {
 	protected static double MIN_PERCENT_NORMAL_CONTAMINATION = 0;
 	protected static boolean MIX_NBR_SUBTREE_SUBCLONE = true;
 	protected static double SEQUENCING_ERROR = 0.001; // Q30
+	protected static String refFileName = "hg38.fa";
 }

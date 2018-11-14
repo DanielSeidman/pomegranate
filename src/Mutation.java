@@ -27,15 +27,16 @@
 */
 
 import java.util.Random;
-
+import java.util.ArrayList;
+import java.util.HashMap;
 public class Mutation {
 	public static final int NUM_CHROMOSOMES = 23; 
 	public static final int[] CHROMOSOME_LENGTHS = {249250621, 243199373, 198022430, 191154276, 
-													180915260, 171115067, 159138663, 155270560, 
-													146364022, 141213431, 135534747, 135006516, 
+													180915260, 171115067, 159138663, 146364022,
+													141213431, 135534747, 135006516, 
 													133851895, 115169878, 107349540, 102531392, 
 													90354753, 81195210, 78077248, 63025520,
-													59373566, 59128983, 51304566, 48129895};
+													59373566, 51304566, 48129895, 59128983, 155270560};
 	protected String name; // unique 
 	protected int chr;
 	protected int haplotype;
@@ -44,7 +45,7 @@ public class Mutation {
 	
 	public Mutation() {
 		name = "M" + counter;
-		chr = r.nextInt(NUM_CHROMOSOMES);
+		chr = r.nextInt(NUM_CHROMOSOMES)+1;
 		haplotype = r.nextInt(2);
 		counter++;
 	}
@@ -66,7 +67,7 @@ public class Mutation {
 		}
 		
 		public String toString() {
-			return name + ": chr=" + (chr + 1) + ", pos="  + position + ", haplotype=" + haplotype;
+			return name + ": chr=" + (chr ) + ", pos="  + position + ", haplotype=" + haplotype;
 		}
 	}
 	
@@ -91,6 +92,53 @@ public class Mutation {
 		
 		public String toString() {
 			return name + ": chr=" + (chr + 1) + ", arm="  + arm + ", haplotype=" + haplotype;
+		}
+	}
+	
+	public static class SV extends Mutation {
+		protected int arm;
+		protected int startPos;
+		protected int endPos;
+		public SV(HashMap<Integer, ArrayList<SVData>> svs) {
+			super();
+			Integer chrom = r.nextInt(24)+1;
+			if(svs.isEmpty())
+			{
+				System.out.println("No more unique SVs available.");
+				endPos=-5;
+				startPos=-5;
+				chr = -5;
+				arm=-5;
+				return;
+			}
+			
+			while(!svs.containsKey(chrom) || svs.get(chrom).size()<=0)
+				chrom = r.nextInt(24)+1;
+			int index = r.nextInt(svs.get(chrom).size());
+			SVData data = svs.get(chrom).get(index);
+			svs.get(chrom).remove(index);
+			if(svs.get(chrom).isEmpty())
+				svs.remove(chrom);
+			
+			if((data.startPos+data.endPos)/2 <= CHROMOSOME_LENGTHS[chr]/2) {
+				arm = 0;
+			} else {
+				arm = 1;
+			}
+			startPos = data.startPos;
+			endPos = data.endPos;
+			name = "SV_"+data.name;
+		}
+		
+		public SV(SNV parent) {
+			super();
+			chr = parent.chr;
+			
+			
+		}
+		
+		public String toString() {
+			return name + ": chr=" + (chr) + ", arm="  + arm + ", haplotype=" + haplotype;
 		}
 	}
 }

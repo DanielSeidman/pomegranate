@@ -35,6 +35,7 @@ public class CellPopulation {
 	protected int size;
 	/** List of mutations in the cells */
 	protected ArrayList<Mutation> mutations;
+	protected ArrayList<String> topSVNames;
 	/** Number of cells in the population, including all the undead descendants */
 	protected int subtreeSize;
 
@@ -48,6 +49,7 @@ public class CellPopulation {
 	public CellPopulation() {
 		size = 0;
 		mutations = new ArrayList<Mutation>();
+		topSVNames = new ArrayList<String>();
 		isDead = false;
 		isGermline = false;
 		id = counter;
@@ -99,6 +101,19 @@ public class CellPopulation {
 		}
 	}
 	
+	public Mutation getLastSNVORCNVMutation() {
+		int index = mutations.size()-1;
+		while(index > 0 && (mutations.get(index) instanceof Mutation.SV)) {
+			index--;
+		}
+		if(index>=0){
+			return mutations.get(index);
+		}
+		else {
+			return null;
+		}
+	}
+	
 	public void setSubtreeSize(int size) {
 		subtreeSize = size;
 	}
@@ -116,7 +131,11 @@ public class CellPopulation {
 	}
 	
 	public String getName() {
-		return getLastMutation().name;// + "," + size;
+		String s = getLastSNVORCNVMutation().name;
+		for(String sv: topSVNames)
+			s+=","+sv;
+			
+		return s;// + "," + size;
 	}
 	
 	@Override
@@ -130,5 +149,10 @@ public class CellPopulation {
 	@Override 
 	public int hashCode() {
 		return ((Integer)id).hashCode();
+	}
+	
+	public void addSVName(String s){
+		topSVNames.add(s);
+		
 	}
 }

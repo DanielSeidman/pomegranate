@@ -72,6 +72,8 @@ public class TumorSample {
 			int totalNumCells = 0;
 			for(CellPopulation c : cellPopulationCounts.keySet()) {
 				for(Mutation snv : c.getMutations()) {
+					if(snv instanceof Mutation.SV)
+						continue;
 					if(snvCounts.containsKey(snv)) {
 						int count = snvCounts.get(snv).intValue();
 						snvCounts.put(snv, count + cellPopulationCounts.get(c));
