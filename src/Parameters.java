@@ -25,4 +25,5 @@ public class Parameters {
 	protected static boolean MIX_NBR_SUBTREE_SUBCLONE = true;
 	protected static double SEQUENCING_ERROR = 0.001; // Q30
 	protected static String refFileName = "hg38.fa";
+	protected static boolean printReferences = true;
 }

@@ -105,13 +105,17 @@ public class LineageSimulator {
 						samples.add(lineageTree.getSample());
 					}
 				}
-				
+				int sampleOutCount=0;
+				HashMap<CellPopulation, ArrayList<Integer>> sampleMap = new HashMap<CellPopulation, ArrayList<Integer>>();
 				ArrayList<CellPopulation> sampleCells = new ArrayList<CellPopulation>();
 				for(TumorSample tm: samples){
 					CellPopulation maxMutations;
 					for(CellPopulation cellP: tm.cellPopulationCounts.keySet()){
 						sampleCells.add(cellP);
-						
+						if(!sampleMap.containsKey(cellP))
+							sampleMap.put(cellP, new ArrayList<Integer>());
+						sampleMap.get(cellP).add(sampleOutCount);
+						sampleOutCount++;
 					}
 					
 				}
@@ -163,6 +167,10 @@ public class LineageSimulator {
 				String lineageFileName =  treeDir.getAbsolutePath() + "/SUBCLONES_s" + numSamples + ".txt";
 				writeSubclonesToFile(lineageFileName, subclones);
 				
+				String cellTypeRatiosFileName = treeDir.getAbsolutePath() + "Cell_Type_Ratios" + numSamples + ".txt";
+				writeCellTypeRatiosToFile(cellTypeRatiosFileName, samples, sampleMap);
+				
+				
 			}
 			writeOutputFile(treeDir.getAbsolutePath() + "/TREE_plain.txt", lineageTree.toString());
 			if(args.generateDOT) {
@@ -174,6 +182,8 @@ public class LineageSimulator {
 		logger.info("[SUMMARY] Simulated " + Parameters.NUM_TREES + " trees. Average number of nodes / tree = " + (double) totalNumNodes/(Parameters.NUM_TREES));
 	}
 	
+	
+
 	/**
 	 * Sample from a binomial with mean = true freq(f) and variance f(1-f)/coverage + sequencing noise 
 	 */
@@ -389,11 +399,15 @@ public class LineageSimulator {
 		options.addOption("dot", false, "Produce DOT files for the simulated trees");
 		options.addOption("sdot", "sampledDot", false, "Produce DOT files for the simulated trees with indicated samples");		
 		options.addOption("sampleProfile", false, "Output VAF file includes an additional column with the binary sample profile for each SNV");		
+		options.addOption("refP", "printReferences", false, "Do Not print references to files");
+		
 		
 		// other
 		options.addOption("v", "verbose", false, "Verbose mode");
 		options.addOption("h", "help", false, "Print usage");
-			
+		
+		
+		
 		// display order
 		ArrayList<Option> optionsList = new ArrayList<Option>();
 		optionsList.add(options.getOption("dir"));
@@ -424,6 +438,7 @@ public class LineageSimulator {
 		optionsList.add(options.getOption("svFile3"));
 		optionsList.add(options.getOption("svFile4"));
 		optionsList.add(options.getOption("refFile"));
+		optionsList.add(options.getOption("printRefs"));
 		
 		CommandLineParser parser = new BasicParser();
 		CommandLine cmdLine = null;
@@ -507,6 +522,9 @@ public class LineageSimulator {
 		}
 		if(cmdLine.hasOption("maxNC")) {
 			Parameters.MAX_PERCENT_NORMAL_CONTAMINATION = Double.parseDouble(cmdLine.getOptionValue("maxNC"));
+		}
+		if(cmdLine.hasOption("refP")) {
+			Parameters.printReferences=false;
 		}
 		if(Parameters.MAX_PERCENT_NORMAL_CONTAMINATION <  Parameters.MIN_PERCENT_NORMAL_CONTAMINATION) {
 			Parameters.MAX_PERCENT_NORMAL_CONTAMINATION = Parameters.MIN_PERCENT_NORMAL_CONTAMINATION;
@@ -613,6 +631,8 @@ public class LineageSimulator {
 	}
 	
 	public static void printRefPlus(ArrayList<CellPopulation> sampleNodes, String filePath) throws IOException{
+		if(!Parameters.printReferences)
+			return;
 		ArrayList<String> ongoingLines = new ArrayList<String>();
 		ArrayList<Integer> openSVs = new ArrayList<Integer>();
 		ArrayList<HashMap<Integer, HashMap<Integer, Mutation>>> variants = new ArrayList<HashMap<Integer, HashMap<Integer, Mutation>>>();
@@ -788,6 +808,38 @@ public class LineageSimulator {
 			 
 			bw.close();
 		}
+	}
+	
+	private static void writeCellTypeRatiosToFile(String fileName, ArrayList<TumorSample> samples,
+			HashMap<CellPopulation, ArrayList<Integer>> sampleCells) {
+		try {
+			FileWriter fw = new FileWriter(fileName);
+			
+			for(TumorSample tm: samples){
+				int total = 0;
+				for(CellPopulation cp: tm.cellPopulationCounts.keySet()){
+					total+=tm.cellPopulationCounts.get(cp);
+				}
+				total+=tm.numNormalCells;
+				total=total*2;
+				fw.write("Tumor_Sample_0:");
+				for(CellPopulation cp: tm.cellPopulationCounts.keySet()){
+					double cellFraction = tm.cellPopulationCounts.get(cp);
+					int val = (int) Math.round(cellFraction/total*50.0);
+					fw.write("\t"+sampleCells.get(cp).get(0)+":"+val);
+				}
+				fw.write("\t"+"normal"+":"+Math.round((tm.numNormalCells+total/2.0)/total*50));
+				fw.write("\n");
+			}
+				
+			
+			fw.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+			System.err.println("Failed to write to the file: " + fileName);
+			System.exit(-1);
+		}
+		
 	}
 
 

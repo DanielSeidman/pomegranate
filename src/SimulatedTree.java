@@ -600,7 +600,10 @@ public class SimulatedTree {
 			svCount++;
 			Mutation.SV childMut = new Mutation.SV(svs);
 			Stack<CellPopulation> stack = new Stack<CellPopulation>();
-			stack.push(choices.get((int)(Math.random()*choices.size())));
+			int count = 0;
+			CellPopulation cellPop = choices.get((int)(Math.random()*choices.size()));
+			int depth = (int) Math.floor(Math.random()*distanceToGermline(cellPop));
+			stack.push(randomAncestor(cellPop, depth));
 			stack.get(0).addSVName(childMut.name);
 			while(!stack.isEmpty()){
 				CellPopulation current = stack.pop();
@@ -612,6 +615,23 @@ public class SimulatedTree {
 						stack.push(child);
 			}
 		}
+	}
+	
+	public int distanceToGermline(CellPopulation child){
+		if(parents.containsKey(parents.get(child)))
+				return 1+distanceToGermline(parents.get(child));
+		return 0;
+			
+	
+}
+	
+	public CellPopulation randomAncestor(CellPopulation child, int depth){
+			if(depth>0 && parents.containsKey(child))
+				if(parents.containsKey(parents.get(child)))
+					return randomAncestor(parents.get(child), depth-1);
+			return child;
+				
+		
 	}
 
 }
