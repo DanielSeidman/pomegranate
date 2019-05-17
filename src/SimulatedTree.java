@@ -470,12 +470,17 @@ public class SimulatedTree {
 	public void printRefPlus(ArrayList<CellPopulation> sampleNodes) throws IOException{
 		ArrayList<String> ongoingLines = new ArrayList<String>();
 		ArrayList<Integer> openSVs = new ArrayList<Integer>();
+		ArrayList<Integer> openCNVs = new ArrayList<Integer>();
+		ArrayList<ArrayList<Character>> trackingCNVs = new ArrayList<ArrayList<Character>>();
+		
 		ArrayList<HashMap<Integer, HashMap<Integer, Mutation>>> variants = new ArrayList<HashMap<Integer, HashMap<Integer, Mutation>>>();
 		ArrayList<BufferedWriter> outputStreams = new ArrayList<BufferedWriter>();
 		int sampleCount=0;
 		for(CellPopulation cp: sampleNodes){
 			ongoingLines.add("");
 			openSVs.add(-1);
+			openCNVs.add(-1);
+			trackingCNVs.add(new ArrayList<Character>());
 			variants.add(toPositionMap(cp));
 			File fout = new File("S:\\genomeData\\outputSimulation1\\sampleRef"+sampleCount+".fa");
 			FileOutputStream fos = new FileOutputStream(fout);
@@ -552,13 +557,18 @@ public class SimulatedTree {
 				    					base='a';
 			    				}
 			    			}
-			    			else if(m instanceof Mutation.SV)
+			    			else if(m instanceof Mutation.SV && !((Mutation.SV)m).dup)
 			    				openSVs.set(x, ((Mutation.SV)m).endPos);
+			    			else if(m instanceof Mutation.SV && ((Mutation.SV)m).dup){
+			    				openCNVs.set(x, ((Mutation.SV)m).endPos);
+			    			}
 			    				
 			    		}
 			    		String s = ongoingLines.get(x);
-		    			if(openSVs.get(x)==-1){
+		    			if(openSVs.get(x)==-1){//Deletions and Duplications should not overlap. If they do, deletions are assumed older
+		    				
 		    				ongoingLines.set(x, ongoingLines.get(x)+base);
+		    				trackingCNVs.get(x).add(base);
 		    				if(ongoingLines.get(x).length()==50){
 		    					BufferedWriter bw = outputStreams.get(x);
 		    					bw.write(ongoingLines.get(x));
@@ -568,6 +578,19 @@ public class SimulatedTree {
 		    			}
 		    			else if(openSVs.get(x)==index+charIndex)
 		    				openSVs.set(x, -1);
+		    			if(openCNVs.get(x)==index+charIndex){
+		    				for(Character c: trackingCNVs.get(x)){
+		    					ongoingLines.set(x, ongoingLines.get(x)+c);
+		    					if(ongoingLines.get(x).length()==50){
+			    					BufferedWriter bw = outputStreams.get(x);
+			    					bw.write(ongoingLines.get(x));
+									bw.newLine();
+									ongoingLines.set(x, "");
+			    				}
+		    				}
+		    				trackingCNVs.set(x, new ArrayList<Character>());
+		    				openCNVs.set(x, -1);
+		    			}
 		    			
 		    				
 		    			
@@ -613,6 +636,36 @@ public class SimulatedTree {
 				if(edges.containsKey(current))
 					for(CellPopulation child: edges.get(current))
 						stack.push(child);
+			}
+		}
+	}
+	
+	
+	public void propogateDupMutation(HashMap<Integer, ArrayList<SVData>> svs, ArrayList<CellPopulation> choices){
+		int svCount = 0;
+		while(!svs.isEmpty() && svCount<choices.size()*50){
+			svCount++;
+			Mutation.SV childMut = new Mutation.SV(svs, true);
+			Stack<CellPopulation> stack = new Stack<CellPopulation>();
+			
+			ArrayList<CellPopulation> randomChoices = (ArrayList<CellPopulation>) choices.clone();
+			Collections.shuffle(randomChoices);
+			for(CellPopulation cellPop: randomChoices){
+				if(cellPop.isOverlap((Mutation.SV)childMut))
+					continue;
+				//CellPopulation cellPop = choices.get((int)(Math.random() * choices.size()));
+				int depth = (int) Math.floor(Math.random() * distanceToGermline(cellPop));
+				stack.push(randomAncestor(cellPop, depth));
+				stack.get(0).addSVName(childMut.name);
+				while(!stack.isEmpty()){
+					CellPopulation current = stack.pop();
+					current.addMutation(childMut);
+					
+					//current.addToName(childMut.name);
+					if(edges.containsKey(current))
+						for(CellPopulation child: edges.get(current))
+							stack.push(child);
+				}
 			}
 		}
 	}

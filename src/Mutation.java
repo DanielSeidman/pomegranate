@@ -73,10 +73,15 @@ public class Mutation {
 	
 	public static class CNV extends Mutation {
 		protected int arm;
+		protected int duplicates;
+		protected int position;
+		protected int length;
 		public CNV() {
 			super();
 			arm = r.nextInt(2);
 			name = "CNV_" + name;
+			length = (int)(Math.random()*2*118000);
+			position = Math.min(r.nextInt(CHROMOSOME_LENGTHS[chr]), CHROMOSOME_LENGTHS[chr]-length);
 		}
 		
 		public CNV(SNV parent) {
@@ -87,7 +92,16 @@ public class Mutation {
 			} else {
 				arm = 1;
 			}
+			length = (int)(Math.random()*2*118000);
+			position = Math.min(r.nextInt(CHROMOSOME_LENGTHS[chr]), CHROMOSOME_LENGTHS[chr]-length);
 			name = "CNV_" + name;
+		}
+		
+		public CNV(CNV parent){
+			arm=parent.arm;
+			duplicates=parent.duplicates+1;
+			position=parent.position;
+			length = parent.length;
 		}
 		
 		public String toString() {
@@ -99,8 +113,10 @@ public class Mutation {
 		protected int arm;
 		protected int startPos;
 		protected int endPos;
+		boolean dup;
 		public SV(HashMap<Integer, ArrayList<SVData>> svs) {
 			super();
+			dup = false;
 			Integer chrom = r.nextInt(24)+1;
 			if(svs.isEmpty())
 			{
@@ -128,17 +144,56 @@ public class Mutation {
 			startPos = data.startPos;
 			endPos = data.endPos;
 			name = "SV_"+data.name;
+			if(dup)
+				name+="duplication";
+			else
+				name+="deletion";
+		}
+		
+		public SV(HashMap<Integer, ArrayList<SVData>> svs, boolean duplicate) {
+			super();
+			dup = true;
+			Integer chrom = r.nextInt(24)+1;
+			if(svs.isEmpty())
+			{
+				System.out.println("No more unique SVs available.");
+				endPos=-5;
+				startPos=-5;
+				chr = -5;
+				arm=-5;
+				return;
+			}
+			
+			while(!svs.containsKey(chrom) || svs.get(chrom).size()<=0)
+				chrom = r.nextInt(24)+1;
+			int index = r.nextInt(svs.get(chrom).size());
+			SVData data = svs.get(chrom).get(index);
+			svs.get(chrom).remove(index);
+			if(svs.get(chrom).isEmpty())
+				svs.remove(chrom);
+			
+			if((data.startPos+data.endPos)/2 <= CHROMOSOME_LENGTHS[chr]/2) {
+				arm = 0;
+			} else {
+				arm = 1;
+			}
+			startPos = data.startPos;
+			endPos = data.endPos;
+			name = "SV_"+data.name;
+			if(dup)
+				name+="duplication";
+			else
+				name+="deletion";
 		}
 		
 		public SV(SNV parent) {
 			super();
-			chr = parent.chr;
-			
-			
+			dup=false;
+			chr = parent.chr;			
 		}
 		
 		public String toString() {
-			return name + ": chr=" + (chr) + ", arm="  + arm + ", haplotype=" + haplotype;
+				return name + ": chr=" + (chr) + ", arm="  + arm + ", haplotype=" + haplotype;
 		}
 	}
 }

@@ -69,6 +69,18 @@ public class CellPopulation {
 		mutations.add(snv);
 	}
 	
+	public boolean isOverlap(Mutation.SV compareMut){
+		for(Mutation m: mutations){
+			if(m instanceof Mutation.SNV)
+				continue;
+			int mStart = ((Mutation.SV)m).startPos;
+			int mEnd = ((Mutation.SV)m).endPos;
+			if((compareMut.chr == m.chr) && (((mStart > compareMut.startPos) && (mStart < compareMut.endPos)) || ((mEnd > compareMut.startPos) && (mEnd < compareMut.endPos))))
+				return true;
+		}
+		return false;
+	}
+	
 	public void setMutations(ArrayList<Mutation> populationMutations) {
 		mutations = new ArrayList<Mutation>(populationMutations);
 	}

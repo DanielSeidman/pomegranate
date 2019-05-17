@@ -120,6 +120,7 @@ public class LineageSimulator {
 					
 				}
 				lineageTree.propogateSVMutation(svs, sampleCells);
+				lineageTree.propogateDupMutation(svs, sampleCells);
 				printRefPlus(sampleCells, treeDir.getAbsolutePath());
 				for(CellPopulation cellP: sampleCells)
 					System.out.println("num mutations: "+cellP.getMutations().size());
