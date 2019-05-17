@@ -666,6 +666,7 @@ public class SimulatedTree {
 						for(CellPopulation child: edges.get(current))
 							stack.push(child);
 				}
+				break;
 			}
 		}
 	}
